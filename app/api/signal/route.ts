@@ -1,23 +1,46 @@
 import { NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { supabaseAdmin } from "../../../lib/supabaseAdmin";
 
 export const runtime = "nodejs";
 
-const KV_KEY_LATEST = "latest_signal";
-
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const key = url.searchParams.get("key") || "";
+  try {
+    const url = new URL(req.url);
+    const key = url.searchParams.get("key") || "";
 
-  if (!process.env.SIGNAL_SECRET || key !== process.env.SIGNAL_SECRET) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    if (!process.env.SIGNAL_SECRET || key !== process.env.SIGNAL_SECRET) {
+      return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from("signals")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    if (!data || data.length === 0) {
+      return NextResponse.json({ ok: true, empty: true });
+    }
+
+    const s: any = data[0];
+    return NextResponse.json({
+      ok: true,
+      signal: {
+        id: s.id,
+        symbol_mt5: s.symbol_mt5,
+        side: s.side,
+        entry: Number(s.entry),
+        sl: Number(s.sl),
+        tp: Number(s.tp),
+        tf: s.tf,
+        ts: Math.floor(new Date(s.created_at).getTime() / 1000),
+      },
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
-
-  const signal = await kv.get(KV_KEY_LATEST);
-
-  if (!signal) {
-    return NextResponse.json({ ok: true, empty: true });
-  }
-
-  return NextResponse.json({ ok: true, signal });
 }
