@@ -6,10 +6,11 @@ import { supabaseAdmin } from "../../../lib/supabaseAdmin";
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  const secret = req.headers.get("x-webhook-secret") || "";
-  if (!process.env.WEBHOOK_SECRET || secret !== process.env.WEBHOOK_SECRET) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const secret = req.headers.get("x-telegram-bot-api-secret-token");
+  if (secret !== process.env.SIGNAL_SECRET) {
+    return new Response("Unauthorized", { status: 401 });
   }
+
 
   const update = await req.json();
   const msg = update.message || update.channel_post;
