@@ -1,48 +1,61 @@
 // lib/parse.ts
-export type ParsedSignal = {
-  symbol: string | null; // BTCUSD / XAUUSD
-  tf: string | null; // M5 / H1 ...
-  side: 'BUY' | 'SELL' | 'CLOSE' | null;
-  entry: number | null;
-  sl: number | null;
-  tp: number | null;
-};
 
-function toNumberSafe(s: string | undefined | null): number | null {
-  if (!s) return null;
-  const cleaned = s.replace(/,/g, '').trim();
+type Side = "BUY" | "SELL";
+
+function normalizeNumber(s: string): number | null {
+  // รองรับ 5067,49 -> 5067.49 และลบ comma ที่เป็น thousands (ถ้ามี)
+  const cleaned = s
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/,/g, "."); // เคสคุณใช้ comma เป็น decimal
+
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
 
-export function parseSignal(rawText: string): ParsedSignal | null {
-  const text = (rawText || '').trim();
-  if (!text) return null;
+export function parseSignalFromText(text: string): {
+  ok: boolean;
+  error?: string;
+  symbol?: string;
+  tf?: string;
+  side?: Side;
+  entry?: number;
+  sl?: number;
+  tp?: number;
+} {
+  const t = text || "";
 
-  // เราโฟกัสเฉพาะ ENTRY ก่อน (ตามที่คุณใช้จริง)
-  // ✅ ENTRY LONG -> BUY
-  // ✅ ENTRY SHORT -> SELL
-  // ถ้ามีคำว่า EXIT/CLOSE ให้เป็น CLOSE (optional)
-  const isEntryLong = /ENTRY\s+LONG/i.test(text);
-  const isEntryShort = /ENTRY\s+SHORT/i.test(text);
-  const isClose = /(EXIT|CLOSE)\b/i.test(text);
+  // ต้องมี ENTRY LONG/SHORT เท่านั้นถึงจะถือเป็นสัญญาณเข้า
+  const isLong = /ENTRY\s+LONG/i.test(t);
+  const isShort = /ENTRY\s+SHORT/i.test(t);
+  if (!isLong && !isShort) {
+    return { ok: false, error: "missing_entry_long_short" };
+  }
 
-  let side: ParsedSignal['side'] = null;
-  if (isEntryLong) side = 'BUY';
-  else if (isEntryShort) side = 'SELL';
-  else if (isClose) side = 'CLOSE';
-  else return null; // ไม่ใช่สัญญาณที่เราต้องการ
+  const side: Side = isLong ? "BUY" : "SELL";
 
-  // symbol + tf:  "BTCUSD | TF : M5"
-  // รองรับเว้นวรรคหลากหลาย
-  const symTf = text.match(/([A-Z0-9_\.]+)\s*\|\s*TF\s*[:：]\s*([A-Z0-9]+)/i);
-  const symbol = symTf?.[1]?.toUpperCase() ?? null;
-  const tf = symTf?.[2]?.toUpperCase() ?? null;
+  // หา symbol และ TF
+  // รูปแบบ: "XAUUSD | TF : M5"
+  const mSymTf = t.match(/([A-Z0-9._-]+)\s*\|\s*TF\s*[:=]\s*([A-Z0-9]+)/i);
+  const symbol = mSymTf?.[1]?.toUpperCase();
+  const tf = mSymTf?.[2]?.toUpperCase();
 
-  // Entry/SL/TP: "Entry: 5086.72"
-  const entry = toNumberSafe(text.match(/Entry\s*[:：]\s*([0-9\.,]+)/i)?.[1]);
-  const sl = toNumberSafe(text.match(/\bSL\s*[:：]\s*([0-9\.,]+)/i)?.[1]);
-  const tp = toNumberSafe(text.match(/\bTP\s*[:：]\s*([0-9\.,]+)/i)?.[1]);
+  if (!symbol || !tf) {
+    return { ok: false, error: "missing_symbol_or_tf" };
+  }
 
-  return { symbol, tf, side, entry, sl, tp };
+  // Entry/SL/TP
+  const mEntry = t.match(/Entry\s*:\s*([0-9.,]+)/i);
+  const mSL = t.match(/\bSL\s*:\s*([0-9.,]+)/i);
+  const mTP = t.match(/\bTP\s*:\s*([0-9.,]+)/i);
+
+  const entry = mEntry ? normalizeNumber(mEntry[1]) : null;
+  const sl = mSL ? normalizeNumber(mSL[1]) : null;
+  const tp = mTP ? normalizeNumber(mTP[1]) : null;
+
+  if (entry == null || sl == null || tp == null) {
+    return { ok: false, error: "missing_or_bad_entry_sl_tp" };
+  }
+
+  return { ok: true, symbol, tf, side, entry, sl, tp };
 }
