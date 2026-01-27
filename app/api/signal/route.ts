@@ -31,6 +31,8 @@ export async function GET(req: Request) {
       ok: true,
       signal: {
         id: s.id,
+        chat_id: s.chat_id,
+        symbol_tv: s.symbol_tv,
         symbol_mt5: s.symbol_mt5,
         side: s.side,
         entry: Number(s.entry),
@@ -40,6 +42,7 @@ export async function GET(req: Request) {
         ts: Math.floor(new Date(s.created_at).getTime() / 1000),
       },
     });
+    
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }

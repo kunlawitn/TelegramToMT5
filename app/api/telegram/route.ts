@@ -14,6 +14,8 @@ export async function POST(req: Request) {
   const update = await req.json();
   const msg = update.message || update.channel_post;
   const text: string = msg?.text || "";
+  const chatId = String(msg?.chat?.id ?? "");
+
 
   const signal = parseEasyGoldSniper(text);
   if (!signal) {
@@ -24,6 +26,7 @@ export async function POST(req: Request) {
     .from("signals")
     .upsert({
       id: signal.id,
+      chat_id: chatId,
       source: signal.source,
       symbol_tv: signal.symbol_tv,
       symbol_mt5: signal.symbol_mt5,
@@ -34,6 +37,7 @@ export async function POST(req: Request) {
       tp: signal.tp,
       raw: signal.raw,
     });
+    
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
