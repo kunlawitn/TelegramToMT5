@@ -68,6 +68,7 @@ export async function POST(req: Request) {
         got: { chatId, messageId, hasText: !!text },
       });
     }
+    
 
     // 3) Parse signal text -> structured fields
     const parsed = parseSignalFromText(text);
