@@ -115,6 +115,7 @@ export async function POST(req: Request) {
       update?.caption ??
       update?.message?.text ??
       update?.message?.caption ??
+      rawBody?.callback_query?.data ??
       "";
     const trimmedText = typeof text === "string" ? text.trim() : "";
 
@@ -126,6 +127,19 @@ export async function POST(req: Request) {
       preview: trimmedText.slice(0, 160),
     });
 
+    const missingTextOnly = !!chatId && !!messageId && !trimmedText;
+
+    if (!chatId || !messageId || missingTextOnly) {
+      await safeWebhookLog({
+        source: "telegram",
+        ok: true,
+        stage: missingTextOnly ? "missing_text_only" : "missing_required_fields",
+        chat_id: chatId ? String(chatId) : null,
+        message_id: messageId ? Number(messageId) : null,
+        symbol: null,
+        err: missingTextOnly
+          ? "missing text"
+          : "missing chatId/messageId/text",
     if (!chatId || !messageId || !trimmedText) {
       await safeWebhookLog({
         source: "telegram",
@@ -141,6 +155,9 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: true,
         skipped: true,
+        reason: missingTextOnly
+          ? "missing_text"
+          : "missing_chatId_or_messageId_or_text",
         reason: "missing_chatId_or_messageId_or_text",
         got: { chatId, messageId, hasText: !!trimmedText },
       });
@@ -160,6 +177,7 @@ export async function POST(req: Request) {
         message_id: Number(messageId),
         symbol: null,
         err: parsed.error || "not_a_trade_signal",
+        payload: rawBody,
         payload: { text: trimmedText },
       });
 
