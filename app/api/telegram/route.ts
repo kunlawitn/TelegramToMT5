@@ -83,8 +83,14 @@ export async function POST(req: Request) {
     // 2) Read body (Telegram update)
     rawBody = await req.json().catch(() => null);
 
-    // Telegram ส่งมาได้ทั้ง message / channel_post
-    const update = rawBody?.message ?? rawBody?.channel_post ?? null;
+    // Telegram ส่งมาได้หลายชนิด message / channel_post / edited_* / callback_query
+    const update =
+      rawBody?.message ??
+      rawBody?.channel_post ??
+      rawBody?.edited_message ??
+      rawBody?.edited_channel_post ??
+      rawBody?.callback_query?.message ??
+      null;
     if (!update) {
       await safeWebhookLog({
         source: "telegram",
@@ -104,38 +110,53 @@ export async function POST(req: Request) {
     const chatId = update?.chat?.id;
     const messageId = update?.message_id;
     const date = update?.date; // epoch seconds
-    const text = update?.text ?? update?.caption ?? "";
+    const text =
+      update?.text ??
+      update?.caption ??
+      update?.message?.text ??
+      update?.message?.caption ??
+      rawBody?.message?.text ??
+      rawBody?.message?.caption ??
+      rawBody?.channel_post?.text ??
+      rawBody?.channel_post?.caption ??
+      rawBody?.callback_query?.data ??
+      "";
+    const trimmedText = typeof text === "string" ? text.trim() : "";
 
     dbg("[TG] recv", {
       chatId,
       messageId,
       date,
-      textLen: text?.length || 0,
-      preview: (text || "").slice(0, 160),
+      textLen: trimmedText.length || 0,
+      preview: trimmedText.slice(0, 160),
     });
 
-    if (!chatId || !messageId || !text) {
+    const missingTextOnly = !!chatId && !!messageId && !trimmedText;
+
+    if (!chatId || !messageId || missingTextOnly) {
       await safeWebhookLog({
         source: "telegram",
         ok: true,
-        stage: "missing_required_fields",
+        stage: missingTextOnly ? "missing_text_only" : "missing_required_fields",
         chat_id: chatId ? String(chatId) : null,
         message_id: messageId ? Number(messageId) : null,
         symbol: null,
-        err: "missing chatId/messageId/text",
+        err: missingTextOnly ? "missing text" : "missing chatId/messageId/text",
         payload: rawBody,
       });
 
       return NextResponse.json({
         ok: true,
         skipped: true,
-        reason: "missing_chatId_or_messageId_or_text",
-        got: { chatId, messageId, hasText: !!text },
+        reason: missingTextOnly
+          ? "missing_text"
+          : "missing_chatId_or_messageId_or_text",
+        got: { chatId, messageId, hasText: !!trimmedText },
       });
     }
 
     // 3) Parse signal text -> structured fields
-    const parsed = parseSignalFromText(text);
+    const parsed = parseSignalFromText(trimmedText);
 
     dbg("[TG] parsed", parsed);
 
@@ -148,7 +169,7 @@ export async function POST(req: Request) {
         message_id: Number(messageId),
         symbol: null,
         err: parsed.error || "not_a_trade_signal",
-        payload: { text },
+        payload: rawBody,
       });
 
       // ไม่ใช่สัญญาณเข้า (WIN/EXIT/ข้อความอื่น) ก็ข้าม ไม่ต้องทำ 500
@@ -172,7 +193,7 @@ export async function POST(req: Request) {
       message_id: Number(messageId),
       date_ts: date ? new Date(date * 1000).toISOString() : null,
 
-      raw_text: text,
+      raw_text: trimmedText,
 
       symbol: parsed.symbol!,      // base symbol
       symbol_tv: parsed.symbol!,   // เก็บเหมือนกันไปก่อน
