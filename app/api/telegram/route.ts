@@ -119,6 +119,11 @@ export async function POST(req: Request) {
       rawBody?.message?.caption ??
       rawBody?.channel_post?.text ??
       rawBody?.channel_post?.caption ??
+      rawBody?.edited_message?.text ??
+      rawBody?.edited_message?.caption ??
+      rawBody?.edited_channel_post?.text ??
+      rawBody?.edited_channel_post?.caption ??
+      rawBody?.text ??
       rawBody?.callback_query?.data ??
       "";
     const trimmedText = typeof text === "string" ? text.trim() : "";
