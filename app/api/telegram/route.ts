@@ -140,6 +140,15 @@ export async function POST(req: Request) {
         err: missingTextOnly
           ? "missing text"
           : "missing chatId/messageId/text",
+    if (!chatId || !messageId || !trimmedText) {
+      await safeWebhookLog({
+        source: "telegram",
+        ok: true,
+        stage: "missing_required_fields",
+        chat_id: chatId ? String(chatId) : null,
+        message_id: messageId ? Number(messageId) : null,
+        symbol: null,
+        err: "missing chatId/messageId/text",
         payload: rawBody,
       });
 
@@ -149,6 +158,7 @@ export async function POST(req: Request) {
         reason: missingTextOnly
           ? "missing_text"
           : "missing_chatId_or_messageId_or_text",
+        reason: "missing_chatId_or_messageId_or_text",
         got: { chatId, messageId, hasText: !!trimmedText },
       });
     }
@@ -168,6 +178,7 @@ export async function POST(req: Request) {
         symbol: null,
         err: parsed.error || "not_a_trade_signal",
         payload: rawBody,
+        payload: { text: trimmedText },
       });
 
       // ไม่ใช่สัญญาณเข้า (WIN/EXIT/ข้อความอื่น) ก็ข้าม ไม่ต้องทำ 500
