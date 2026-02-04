@@ -25,9 +25,9 @@ export function parseSignalFromText(text: string): {
 } {
   const t = text || "";
 
-  // ต้องมี ENTRY LONG/SHORT เท่านั้นถึงจะถือเป็นสัญญาณเข้า
-  const isLong = /ENTRY\s+LONG/i.test(t);
-  const isShort = /ENTRY\s+SHORT/i.test(t);
+  // ต้องมี ENTRY LONG/SHORT/BUY/SELL เท่านั้นถึงจะถือเป็นสัญญาณเข้า
+  const isLong = /ENTRY\s+(LONG|BUY)/i.test(t);
+  const isShort = /ENTRY\s+(SHORT|SELL)/i.test(t);
   if (!isLong && !isShort) {
     return { ok: false, error: "missing_entry_long_short" };
   }
@@ -35,8 +35,8 @@ export function parseSignalFromText(text: string): {
   const side: Side = isLong ? "BUY" : "SELL";
 
   // หา symbol และ TF
-  // รูปแบบ: "XAUUSD | TF : M5"
-  const mSymTf = t.match(/([A-Z0-9._-]+)\s*\|\s*TF\s*[:=]\s*([A-Z0-9]+)/i);
+  // รูปแบบ: "XAUUSD | TF : M5" หรือ "XAUUSD | TF M5"
+  const mSymTf = t.match(/([A-Z0-9._-]+)\s*\|\s*TF\s*[:=]?\s*([A-Z0-9]+)/i);
   const symbol = mSymTf?.[1]?.toUpperCase();
   const tf = mSymTf?.[2]?.toUpperCase();
 
@@ -45,9 +45,9 @@ export function parseSignalFromText(text: string): {
   }
 
   // Entry/SL/TP
-  const mEntry = t.match(/Entry\s*:\s*([0-9.,]+)/i);
-  const mSL = t.match(/\bSL\s*:\s*([0-9.,]+)/i);
-  const mTP = t.match(/\bTP\s*:\s*([0-9.,]+)/i);
+  const mEntry = t.match(/Entry\s*[:=@]?\s*([0-9.,]+)/i);
+  const mSL = t.match(/\bSL\s*[:=@]?\s*([0-9.,]+)/i);
+  const mTP = t.match(/\bTP(?:1)?\s*[:=@]?\s*([0-9.,]+)/i);
 
   const entry = mEntry ? normalizeNumber(mEntry[1]) : null;
   const sl = mSL ? normalizeNumber(mSL[1]) : null;
