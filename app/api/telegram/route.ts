@@ -115,6 +115,10 @@ export async function POST(req: Request) {
       update?.caption ??
       update?.message?.text ??
       update?.message?.caption ??
+      rawBody?.message?.text ??
+      rawBody?.message?.caption ??
+      rawBody?.channel_post?.text ??
+      rawBody?.channel_post?.caption ??
       rawBody?.callback_query?.data ??
       "";
     const trimmedText = typeof text === "string" ? text.trim() : "";
